@@ -5,11 +5,6 @@ export default async function handler(
   request: VercelRequest,
   response: VercelResponse,
 ) {
-  // 只允许 POST 请求
-  if (request.method !== 'POST') {
-    return response.status(405).json({ error: 'Method not allowed' });
-  }
-
   // 设置 CORS headers
   response.setHeader('Access-Control-Allow-Origin', '*');
   response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -18,6 +13,11 @@ export default async function handler(
   // 处理 OPTIONS 请求（CORS preflight）
   if (request.method === 'OPTIONS') {
     return response.status(200).end();
+  }
+
+  // 只允许 POST 请求
+  if (request.method !== 'POST') {
+    return response.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
@@ -30,13 +30,17 @@ export default async function handler(
     }
 
     // 从环境变量获取 API 密钥
-    const apiKey = process.env.DEEPSEEK_API_KEY || process.env.GEMINI_API_KEY;
+    const deepseekKey = process.env.DEEPSEEK_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const apiKey = deepseekKey || geminiKey;
+    const useDeepSeek = !!deepseekKey;
     
     // 调试日志（不记录实际密钥）
     console.log('Environment check:', {
-      hasDEEPSEEK: !!process.env.DEEPSEEK_API_KEY,
-      hasGEMINI: !!process.env.GEMINI_API_KEY,
+      hasDEEPSEEK: !!deepseekKey,
+      hasGEMINI: !!geminiKey,
       hasApiKey: !!apiKey,
+      usingDeepSeek: useDeepSeek,
       envKeys: Object.keys(process.env).filter(k => k.includes('API') || k.includes('KEY'))
     });
     
@@ -47,31 +51,68 @@ export default async function handler(
       });
     }
 
-    // 调用 OCR API (Gemini)
-    const apiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
+    // 根据使用的 API 选择不同的端点和请求格式
+    let apiUrl: string;
+    let requestBody: any;
+    let requestHeaders: Record<string, string>;
+
+    if (useDeepSeek) {
+      // DeepSeek API 配置
+      apiUrl = 'https://api.deepseek.com/v1/chat/completions';
+      requestHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`, // DeepSeek 使用 Bearer token
+      };
+      requestBody = {
+        model: 'deepseek-chat', // 或 'deepseek-vision' 如果支持图片
+        messages: [
+          {
+            role: 'user',
+            content: [
               {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Image,
-                },
+                type: 'image_url',
+                image_url: {
+                  url: `data:${mimeType};base64,${base64Image}`
+                }
               },
               {
-                text: 'Convert the document in the image to markdown, preserving the original text and structure as accurately as possible.',
+                type: 'text',
+                text: 'Convert the document in the image to markdown, preserving the original text and structure as accurately as possible.'
+              }
+            ]
+          }
+        ],
+        temperature: 0.1,
+      };
+    } else {
+      // Google Gemini API 配置（原有逻辑）
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      requestHeaders = {
+        'Content-Type': 'application/json',
+      };
+      requestBody = {
+        contents: [{
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: base64Image,
               },
-            ],
-          }],
-        }),
-      }
-    );
+            },
+            {
+              text: 'Convert the document in the image to markdown, preserving the original text and structure as accurately as possible.',
+            },
+          ],
+        }],
+      };
+    }
+
+    // 调用 OCR API
+    const apiResponse = await fetch(apiUrl, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify(requestBody),
+    });
 
     if (!apiResponse.ok) {
       const errorText = await apiResponse.text();
