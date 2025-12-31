@@ -7,9 +7,11 @@
  */
 export const extractTextFromImage = async (base64ImageData: string, mimeType: string): Promise<string> => {
   try {
-    // Call Netlify Function instead of directly calling the API
+    // Call Vercel API route (or Netlify Function if on Netlify)
     // This keeps the API key secure on the server side
-    const functionUrl = '/.netlify/functions/ocr';
+    // Detect which platform we're on
+    const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+    const functionUrl = isVercel ? '/api/ocr' : '/.netlify/functions/ocr';
     
     const response = await fetch(functionUrl, {
       method: 'POST',
