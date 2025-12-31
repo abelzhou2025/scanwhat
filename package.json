@@ -21,6 +21,7 @@
   "devDependencies": {
     "@netlify/functions": "^2.4.1",
     "@types/node": "^22.14.0",
+    "@vercel/node": "^3.0.0",
     "@vitejs/plugin-react": "^5.0.0",
     "netlify-cli": "^20.0.0",
     "tsx": "^4.7.0",
