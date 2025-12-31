@@ -65,18 +65,9 @@ export default async function handler(
       });
     } else {
       // Google Gemini API 配置
-      // 尝试多个可能的模型名称
-      // 如果 gemini-1.5-flash 不可用，尝试其他模型
-      const models = [
-        'gemini-1.5-flash',
-        'gemini-1.5-pro',
-        'gemini-pro',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro-latest'
-      ];
-      
-      // 先尝试 gemini-1.5-flash，如果失败可以尝试其他模型
-      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
+      // 使用 v1 API 版本（更稳定）和 gemini-1.5-pro 模型
+      // 如果 v1 不可用，可以尝试 v1beta 或其他模型名称
+      apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
       requestHeaders = {
         'Content-Type': 'application/json',
       };

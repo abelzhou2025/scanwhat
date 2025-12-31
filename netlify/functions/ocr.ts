@@ -52,10 +52,9 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       };
     }
 
-    // Call DeepSeek-OCR API
-    // Based on DeepSeek-OCR, it uses a similar API structure to Gemini
-    // You may need to adjust the endpoint and request format based on actual DeepSeek-OCR API
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + apiKey, {
+    // Call Google Gemini API for OCR
+    // Using v1 API version and gemini-1.5-pro model (more stable than v1beta)
+    const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=' + apiKey, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
