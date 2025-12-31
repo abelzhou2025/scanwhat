@@ -52,10 +52,6 @@ export default async function handler(
     }
 
     // 根据使用的 API 选择不同的端点和请求格式
-    let apiUrl: string;
-    let requestBody: any;
-    let requestHeaders: Record<string, string>;
-
     if (useDeepSeek) {
       // DeepSeek API 目前不支持图片输入
       // 返回错误提示使用 Gemini API
@@ -63,91 +59,104 @@ export default async function handler(
       return response.status(400).json({ 
         error: 'DeepSeek API does not support image OCR. Please use GEMINI_API_KEY instead for OCR functionality. Set GEMINI_API_KEY in Vercel environment variables and remove DEEPSEEK_API_KEY.' 
       });
-    } else {
-      // Google Gemini API 配置
-      // 使用 v1 API 版本（更稳定）和 gemini-1.5-pro 模型
-      // 如果 v1 不可用，可以尝试 v1beta 或其他模型名称
-      apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
-      requestHeaders = {
-        'Content-Type': 'application/json',
-      };
-      requestBody = {
-        contents: [{
-          parts: [
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Image,
-              },
-            },
-            {
-              text: 'Convert the document in the image to markdown, preserving the original text and structure as accurately as possible.',
-            },
-          ],
-        }],
-      };
     }
 
-    // 调用 OCR API
-    const apiResponse = await fetch(apiUrl, {
-      method: 'POST',
-      headers: requestHeaders,
-      body: JSON.stringify(requestBody),
-    });
+    // Google Gemini API 配置
+    // 尝试多个可能的模型和 API 版本组合
+    const modelConfigs = [
+      { version: 'v1beta', model: 'gemini-pro' },
+      { version: 'v1beta', model: 'gemini-1.5-pro' },
+      { version: 'v1beta', model: 'gemini-1.5-flash' },
+      { version: 'v1', model: 'gemini-pro' },
+      { version: 'v1', model: 'gemini-1.5-pro' },
+    ];
 
-    if (!apiResponse.ok) {
-      const errorText = await apiResponse.text();
-      console.error('API Error:', {
-        status: apiResponse.status,
-        statusText: apiResponse.statusText,
-        error: errorText
-      });
+    const requestHeaders = {
+      'Content-Type': 'application/json',
+    };
+    const requestBody = {
+      contents: [{
+        parts: [
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Image,
+            },
+          },
+          {
+            text: 'Convert the document in the image to markdown, preserving the original text and structure as accurately as possible.',
+          },
+        ],
+      }],
+    };
+
+    // 尝试每个模型配置，直到成功
+    let lastError: any = null;
+    for (const config of modelConfigs) {
+      const apiUrl = `https://generativelanguage.googleapis.com/${config.version}/models/${config.model}:generateContent?key=${apiKey}`;
       
-      // 提供更友好的错误信息
-      let errorMessage = `API call failed: ${apiResponse.status}`;
       try {
-        const errorData = JSON.parse(errorText);
-        if (errorData.error?.message) {
+        console.log(`Trying model: ${config.version}/${config.model}`);
+        const apiResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: requestHeaders,
+          body: JSON.stringify(requestBody),
+        });
+
+        if (apiResponse.ok) {
+          // 成功，使用这个响应
+          const data = await apiResponse.json();
+          
+          let extractedText = '';
+          if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+            extractedText = data.candidates[0].content.parts
+              .map((part: any) => part.text || '')
+              .join('');
+          }
+
+          // 移除不需要的前缀
+          const unwantedPrefixRegex = /^(Based on the image provided, here is the text converted (to|into) Markdown( format)?:?|以下是图片中内容的文字转写：)\s*/i;
+          extractedText = extractedText.replace(unwantedPrefixRegex, '');
+
+          console.log(`Success with model: ${config.version}/${config.model}`);
+          return response.status(200).json({ text: extractedText });
+        } else {
+          // 记录错误，继续尝试下一个模型
+          const errorText = await apiResponse.text();
+          console.warn(`Model ${config.version}/${config.model} failed:`, errorText);
+          lastError = {
+            status: apiResponse.status,
+            error: errorText
+          };
+          // 继续尝试下一个模型
+          continue;
+        }
+      } catch (error: any) {
+        console.warn(`Model ${config.version}/${config.model} error:`, error.message);
+        lastError = error;
+        continue;
+      }
+    }
+
+    // 所有模型都失败了
+    console.error('All Gemini models failed. Last error:', lastError);
+    let errorMessage = 'All Gemini API models failed. Please check your API key and model availability.';
+    if (lastError) {
+      try {
+        const errorData = typeof lastError.error === 'string' ? JSON.parse(lastError.error) : lastError.error;
+        if (errorData?.error?.message) {
           errorMessage = errorData.error.message;
-        } else if (errorData.error) {
-          errorMessage = errorData.error;
         }
       } catch (e) {
-        // 如果无法解析 JSON，使用原始文本
-        if (errorText) {
-          errorMessage = errorText.substring(0, 200); // 限制长度
+        if (lastError.error) {
+          errorMessage = lastError.error.substring(0, 200);
         }
       }
-      
-      return response.status(apiResponse.status).json({ 
-        error: errorMessage 
-      });
     }
-
-    const data = await apiResponse.json();
     
-    // 提取文本（根据不同的 API 响应格式）
-    let extractedText = '';
-    
-    if (useDeepSeek) {
-      // DeepSeek API 响应格式
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        extractedText = data.choices[0].message.content || '';
-      }
-    } else {
-      // Gemini API 响应格式（原有逻辑）
-      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-        extractedText = data.candidates[0].content.parts
-          .map((part: any) => part.text || '')
-          .join('');
-      }
-    }
-
-    // 移除不需要的前缀
-    const unwantedPrefixRegex = /^(Based on the image provided, here is the text converted (to|into) Markdown( format)?:?|以下是图片中内容的文字转写：)\s*/i;
-    extractedText = extractedText.replace(unwantedPrefixRegex, '');
-
-    return response.status(200).json({ text: extractedText });
+    return response.status(lastError?.status || 500).json({ 
+      error: errorMessage 
+    });
   } catch (error: any) {
     console.error('Error in OCR function:', error);
     return response.status(500).json({ 

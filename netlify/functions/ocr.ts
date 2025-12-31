@@ -53,39 +53,102 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     }
 
     // Call Google Gemini API for OCR
-    // Using v1 API version and gemini-1.5-pro model (more stable than v1beta)
-    const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=' + apiKey, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Image,
-              },
-            },
-            {
-              text: 'Convert the document in the image to markdown, preserving the original text and structure as accurately as possible.',
-            },
-          ],
-        }],
-      }),
-    });
+    // Try multiple model configurations with fallback
+    const modelConfigs = [
+      { version: 'v1beta', model: 'gemini-pro' },
+      { version: 'v1beta', model: 'gemini-1.5-pro' },
+      { version: 'v1beta', model: 'gemini-1.5-flash' },
+      { version: 'v1', model: 'gemini-pro' },
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error:', errorText);
-      return {
-        statusCode: response.status,
-        body: JSON.stringify({ error: `API call failed: ${errorText}` }),
-      };
+    let lastError: any = null;
+    let response: any = null;
+    let data: any = null;
+
+    for (const config of modelConfigs) {
+      const apiUrl = `https://generativelanguage.googleapis.com/${config.version}/models/${config.model}:generateContent?key=${apiKey}`;
+      
+      try {
+        if (process.env.NETLIFY_DEV) {
+          console.log(`Trying model: ${config.version}/${config.model}`);
+        }
+        response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Image,
+                  },
+                },
+                {
+                  text: 'Convert the document in the image to markdown, preserving the original text and structure as accurately as possible.',
+                },
+              ],
+            }],
+          }),
+        });
+
+        if (response.ok) {
+          // 成功，使用这个响应
+          data = await response.json();
+          if (process.env.NETLIFY_DEV) {
+            console.log(`Success with model: ${config.version}/${config.model}`);
+          }
+          break; // 跳出循环
+        } else {
+          // 记录错误，继续尝试下一个模型
+          const errorText = await response.text();
+          if (process.env.NETLIFY_DEV) {
+            console.warn(`Model ${config.version}/${config.model} failed:`, errorText);
+          }
+          lastError = {
+            status: response.status,
+            error: errorText
+          };
+          continue; // 继续尝试下一个模型
+        }
+      } catch (error: any) {
+        if (process.env.NETLIFY_DEV) {
+          console.warn(`Model ${config.version}/${config.model} error:`, error.message);
+        }
+        lastError = error;
+        continue;
+      }
     }
 
-    const data = await response.json();
+    // 如果所有模型都失败了
+    if (!response || !response.ok || !data) {
+      console.error('All Gemini models failed. Last error:', lastError);
+      let errorMessage = 'All Gemini API models failed. Please check your API key and model availability.';
+      if (lastError?.error) {
+        try {
+          const errorData = typeof lastError.error === 'string' ? JSON.parse(lastError.error) : lastError.error;
+          if (errorData?.error?.message) {
+            errorMessage = errorData.error.message;
+          }
+        } catch (e) {
+          if (typeof lastError.error === 'string') {
+            errorMessage = lastError.error.substring(0, 200);
+          }
+        }
+      }
+      return {
+        statusCode: lastError?.status || 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        },
+        body: JSON.stringify({ error: errorMessage }),
+      };
+    }
     
     // Extract text from response
     let extractedText = '';
