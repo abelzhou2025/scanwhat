@@ -10,8 +10,6 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 使用 CommonJS 格式以确保兼容性
-
 const distDir = path.join(__dirname, 'dist');
 const redirectsSource = path.join(__dirname, 'public', '_redirects');
 const redirectsDest = path.join(distDir, '_redirects');
