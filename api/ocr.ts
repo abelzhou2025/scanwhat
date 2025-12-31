@@ -57,33 +57,12 @@ export default async function handler(
     let requestHeaders: Record<string, string>;
 
     if (useDeepSeek) {
-      // DeepSeek API 配置
-      apiUrl = 'https://api.deepseek.com/v1/chat/completions';
-      requestHeaders = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`, // DeepSeek 使用 Bearer token
-      };
-      requestBody = {
-        model: 'deepseek-chat', // 或 'deepseek-vision' 如果支持图片
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image_url',
-                image_url: {
-                  url: `data:${mimeType};base64,${base64Image}`
-                }
-              },
-              {
-                type: 'text',
-                text: 'Convert the document in the image to markdown, preserving the original text and structure as accurately as possible.'
-              }
-            ]
-          }
-        ],
-        temperature: 0.1,
-      };
+      // DeepSeek API 目前不支持图片输入
+      // 返回错误提示使用 Gemini API
+      console.warn('DeepSeek API does not support image input. Recommend using Gemini API for OCR.');
+      return response.status(400).json({ 
+        error: 'DeepSeek API does not support image OCR. Please use GEMINI_API_KEY instead for OCR functionality. Set GEMINI_API_KEY in Vercel environment variables and remove DEEPSEEK_API_KEY.' 
+      });
     } else {
       // Google Gemini API 配置（原有逻辑）
       apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
