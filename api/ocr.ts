@@ -104,12 +104,21 @@ export default async function handler(
 
     const data = await apiResponse.json();
     
-    // 提取文本
+    // 提取文本（根据不同的 API 响应格式）
     let extractedText = '';
-    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-      extractedText = data.candidates[0].content.parts
-        .map((part: any) => part.text || '')
-        .join('');
+    
+    if (useDeepSeek) {
+      // DeepSeek API 响应格式
+      if (data.choices && data.choices[0] && data.choices[0].message) {
+        extractedText = data.choices[0].message.content || '';
+      }
+    } else {
+      // Gemini API 响应格式（原有逻辑）
+      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+        extractedText = data.candidates[0].content.parts
+          .map((part: any) => part.text || '')
+          .join('');
+      }
     }
 
     // 移除不需要的前缀
