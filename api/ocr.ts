@@ -139,21 +139,41 @@ export default async function handler(
     // 所有模型都失败了
     console.error('All Gemini models failed. Last error:', lastError);
     let errorMessage = 'All Gemini API models failed. Please check your API key and model availability.';
+    let retryAfter = null;
+    
     if (lastError) {
       try {
         const errorData = typeof lastError.error === 'string' ? JSON.parse(lastError.error) : lastError.error;
         if (errorData?.error?.message) {
           errorMessage = errorData.error.message;
+          
+          // 检查是否是配额错误，提取重试时间
+          if (errorMessage.includes('quota') || errorMessage.includes('Quota exceeded')) {
+            const retryMatch = errorMessage.match(/Please retry in ([\d.]+)s/);
+            if (retryMatch) {
+              retryAfter = Math.ceil(parseFloat(retryMatch[1]));
+              errorMessage = `Quota exceeded. Please wait ${retryAfter} seconds and try again. For more information, visit: https://ai.google.dev/gemini-api/docs/rate-limits`;
+            } else {
+              errorMessage = 'API quota exceeded. Please wait a moment and try again, or check your quota at https://ai.dev/usage?tab=rate-limit';
+            }
+          }
         }
       } catch (e) {
         if (lastError.error) {
-          errorMessage = lastError.error.substring(0, 200);
+          const errorText = typeof lastError.error === 'string' ? lastError.error : JSON.stringify(lastError.error);
+          errorMessage = errorText.substring(0, 200);
+          
+          // 检查配额错误
+          if (errorText.includes('quota') || errorText.includes('Quota exceeded')) {
+            errorMessage = 'API quota exceeded. Please wait a moment and try again, or check your quota at https://ai.dev/usage?tab=rate-limit';
+          }
         }
       }
     }
     
     return response.status(lastError?.status || 500).json({ 
-      error: errorMessage 
+      error: errorMessage,
+      retryAfter: retryAfter
     });
   } catch (error: any) {
     console.error('Error in OCR function:', error);
