@@ -8,17 +8,30 @@
 
 ### 如果 Deploy command 显示 "Required"（必填）
 
-填写以下命令：
+**重要**：由于 Cloudflare Pages 会自动部署 `dist/` 目录，Deploy command 应该使用占位符命令，而不是实际部署命令。
 
+填写以下命令之一：
+
+**选项 1（推荐）**：
 ```
-npx wrangler pages deploy dist
+echo "Deployment handled by Cloudflare Pages"
+```
+
+**选项 2**：
+```
+true
 ```
 
 **完整步骤**：
 1. 点击 **Deploy command** 输入框
-2. 删除当前内容（`/`）
-3. 输入：`npx wrangler pages deploy dist`
+2. 删除当前内容（`npx wrangler pages deploy dist` 或 `/`）
+3. 输入：`echo "Deployment handled by Cloudflare Pages"`
 4. 保存设置
+
+**为什么不用 `wrangler pages deploy`？**
+- 该命令需要 API token 认证和权限
+- Cloudflare Pages 会自动检测并部署 `dist/` 目录
+- 使用占位符命令可以满足必填要求，同时让系统自动处理部署
 
 ### Version command 字段
 
@@ -35,7 +48,7 @@ npx wrangler pages deploy dist
 
 ```
 Build command: npm run build
-Deploy command: npx wrangler pages deploy dist
+Deploy command: echo "Deployment handled by Cloudflare Pages"
 Version command: (留空)
 Root directory: /
 Build output directory: dist
@@ -45,7 +58,7 @@ Build output directory: dist
 
 ```
 Build command: npm run build
-Deploy command: npx wrangler pages deploy dist
+Deploy command: echo "Deployment handled by Cloudflare Pages"
 Version command: echo "Skipping version upload"
 Root directory: /
 Build output directory: dist
@@ -53,14 +66,26 @@ Build output directory: dist
 
 ## 🔍 命令说明
 
-### `npx wrangler pages deploy dist`
-- **作用**: 使用 Wrangler CLI 部署 Cloudflare Pages 项目
-- **参数**: `dist` 是构建输出目录
-- **为什么**: 这是 Cloudflare Pages 的正确部署命令（不是 `wrangler deploy`）
+### `echo "Deployment handled by Cloudflare Pages"`
+- **作用**: 占位符命令，用于满足必填要求
+- **为什么**: 
+  - Cloudflare Pages 会自动检测 `dist/` 目录并自动部署
+  - 不需要手动运行 `wrangler pages deploy`（需要 API token 权限）
+  - 这个命令总是成功，满足必填要求，同时让系统自动处理部署
+
+### `true`
+- **作用**: 另一个占位符选项，总是返回成功
+- **为什么**: 如果 `echo` 命令有问题，可以使用 `true`
 
 ### `echo "Skipping version upload"`
-- **作用**: 一个占位符命令，用于满足必填要求
+- **作用**: 占位符命令，用于满足 Version command 必填要求
 - **为什么**: Version command 是用于 Workers 的，Pages 不需要，但系统要求必填时使用此占位符
+
+### ⚠️ 为什么不使用 `npx wrangler pages deploy dist`？
+- 该命令需要 `CLOUDFLARE_API_TOKEN` 环境变量
+- 需要 API token 有正确的权限（Pages:Edit）
+- 在构建环境中可能没有配置或权限不足
+- Cloudflare Pages 会自动部署，不需要手动命令
 
 ## ⚠️ 重要提示
 
