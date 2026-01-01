@@ -63,12 +63,16 @@ export default async function handler(
 
     // Google Gemini API 配置
     // 尝试多个可能的模型和 API 版本组合
+    // 注意：v1beta API 通常支持更多模型，优先使用
     const modelConfigs = [
-      { version: 'v1beta', model: 'gemini-pro' },
-      { version: 'v1beta', model: 'gemini-1.5-pro' },
+      // 优先使用 v1beta API（支持更多模型）
       { version: 'v1beta', model: 'gemini-1.5-flash' },
+      { version: 'v1beta', model: 'gemini-1.5-pro' },
+      { version: 'v1beta', model: 'gemini-pro' },
+      { version: 'v1beta', model: 'gemini-2.0-flash-exp' },
+      // 然后尝试 v1 API（仅支持部分模型）
+      { version: 'v1', model: 'gemini-1.5-flash' },
       { version: 'v1', model: 'gemini-pro' },
-      { version: 'v1', model: 'gemini-1.5-pro' },
     ];
 
     const requestHeaders = {
