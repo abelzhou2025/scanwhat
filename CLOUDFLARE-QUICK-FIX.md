@@ -18,8 +18,9 @@ For Pages, please run `wrangler pages deploy` instead.
 1. 点击项目名称进入项目详情
 2. 点击 **Settings** 标签
 3. 滚动到 **Builds & deployments** 部分
-4. 找到 **Deploy command** 字段
-5. **完全删除/清空这个字段**（留空，不要填写任何内容）
+4. 找到以下字段并修改：
+   - **Deploy command**: **完全删除/清空**（留空，不要填写 `/` 或任何内容）
+   - **Version command**: **完全删除/清空**（留空，不要填写 `npx wrangler versions upload` 或任何内容）
 
 ### 步骤 3: 验证其他设置
 确保以下设置正确：
@@ -27,7 +28,8 @@ For Pages, please run `wrangler pages deploy` instead.
 - ✅ **Build command**: `npm run build`
 - ✅ **Build output directory**: `dist`
 - ✅ **Root directory**: `/` (留空或 `/`)
-- ✅ **Deploy command**: **(留空，不要设置)**
+- ✅ **Deploy command**: **(留空，不要设置任何内容)**
+- ✅ **Version command**: **(留空，不要设置任何内容)**
 
 ### 步骤 4: 保存并重新部署
 1. 点击 **Save** 保存设置
