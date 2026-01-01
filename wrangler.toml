@@ -2,9 +2,14 @@ name = "scanwhat"
 compatibility_date = "2024-01-01"
 
 # Cloudflare Pages 配置
-# 静态资源目录（构建输出）
+# 如果使用 wrangler pages deploy，需要指定 assets 目录
+# 如果使用 Cloudflare Dashboard 自动部署，不需要此配置
 pages_build_output_dir = "dist"
 
-# Pages Functions 目录（自动检测 functions/ 目录）
-# Cloudflare Pages 会自动识别 functions/ 目录中的函数
+# 注意：Cloudflare Pages 的标准部署方式不需要自定义部署命令
+# 如果遇到 "Missing entry-point" 错误，请检查 Cloudflare Pages 项目设置：
+# 1. 不要设置自定义部署命令（Deploy command）
+# 2. 确保构建命令（Build command）为: npm run build
+# 3. 确保输出目录（Output directory）为: dist
+# 4. Cloudflare Pages 会自动识别 functions/ 目录中的 Functions
 
